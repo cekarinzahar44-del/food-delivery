@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Delivery</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 20px; background: white; border-bottom: 2px solid #e0e0e0; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 24px; color: #0088cc; }
+        .cart { position: relative; font-size: 28px; cursor: pointer; }
+        .cart-count { position: absolute; top: -8px; right: -8px; background: #ff4444; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+        .categories { display: flex; gap: 8px; padding: 15px; overflow-x: auto; background: white; margin: 10px 0; }
+        .categories::-webkit-scrollbar { display: none; }
+        .cat-btn { padding: 10px 16px; background: white; border: 2px solid #e0e0e0; border-radius: 20px; cursor: pointer; white-space: nowrap; font-size: 14px; transition: all 0.3s; }
+        .cat-btn.active { background: #0088cc; color: white; border-color: #0088cc; }
+        .cat-btn:hover { background: #f0f0f0; }
+        .menu { padding: 15px; padding-bottom: 80px; }
+        .dish { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .dish-info { flex: 1; }
+        .dish-name { font-weight: 600; margin-bottom: 5px; font-size: 16px; }
+        .dish-desc { font-size: 13px; color: #666; margin-bottom: 10px; line-height: 1.4; }
+        .dish-footer { display: flex; justify-content: space-between; align-items: center; }
+        .price { font-size: 18px; font-weight: 700; color: #0088cc; }
+        .add-btn { background: #0088cc; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.3s; }
+        .add-btn:hover { background: #0077b3; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal.active { display: flex; align-items: flex-end; }
+        .modal-content { background: white; width: 100%; max-height: 70vh; border-radius: 20px 20px 0 0; padding: 20px; overflow-y: auto; animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f0f0f0; }
+        .modal-header h2 { font-size: 22px; }
+        .close { background: none; border: none; font-size: 28px; cursor: pointer; color: #666; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background 0.3s; }
+        .close:hover { background: #f0f0f0; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+        .cart-item-info { flex: 1; }
+        .cart-item-name { font-weight: 600; margin-bottom: 3px; }
+        .cart-item-price { font-size: 13px; color: #666; }
+        .cart-item-controls { display: flex; align-items: center; gap: 10px; }
+        .qty-btn { width: 32px; height: 32px; border: none; background: #f0f0f0; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: 600; transition: background 0.3s; }
+        .qty-btn:hover { background: #e0e0e0; }
+        .qty-value { font-weight: 600; min-width: 24px; text-align: center; font-size: 16px; }
+        .total { font-size: 22px; font-weight: 700; text-align: right; margin: 20px 0; color: #0088cc; }
+        .checkout { background: #0088cc; color: white; border: none; padding: 16px; border-radius: 12px; width: 100%; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.3s; }
+        .checkout:hover { background: #0077b3; }
+        .empty-cart { text-align: center; color: #999; padding: 40px; font-size: 16px; }
+        .no-dishes { text-align: center; color: #999; padding: 40px; font-size: 16px; }
+    </style></head>
+<body>
+    <div class="header">
+        <h1>🍔 Food Delivery</h1>
+        <div class="cart" onclick="toggleCart()">🛒 <span class="cart-count" id="count">0</span></div>
+    </div>
+    
+    <div class="categories" id="categories"></div>
+    <div class="menu" id="menu"></div>
+    
+    <div class="modal" id="modal" onclick="if(event.target===this)toggleCart()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>🛒 Корзина</h2>
+                <button class="close" onclick="toggleCart()">✕</button>
+            </div>
+            <div id="cartItems"></div>
+            <div class="total" id="total"></div>
+            <button class="checkout" onclick="checkout()">Оформить заказ</button>
+        </div>
+    </div>
+
+    <script>
+        // 🔥 ВАЖНО: Измени на URL твоего бота на BotHost!
+        const API_URL = 'https://food-delivery.твой-логин.boothost.ru';
+        
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        let cart = [];
+        let dishes = [];
+        let currentCat = 'all';
+        
+        const cats = {
+            all: 'Все',
+            pizza: '🍕 Пицца',
+            burgers: '🍔 Бургеры',
+            sushi: '🍣 Суши',
+            pasta: '🍝 Паста',
+            salads: '🥗 Салаты',
+            drinks: '🥤 Напитки'
+        };
+        
+        async function loadDishes() {
+            try {
+                const url = API_URL + '/api/dishes' + (currentCat !== 'all' ? '?category=' + currentCat : '');
+                const res = await fetch(url);
+                dishes = await res.json();
+                render();
+            } catch (error) {                console.error('Ошибка загрузки блюд:', error);
+                document.getElementById('menu').innerHTML = '<p class="no-dishes">⚠️ Ошибка загрузки меню. Попробуйте позже.</p>';
+            }
+        }
+        
+        function renderCats() {
+            const div = document.getElementById('categories');
+            div.innerHTML = Object.entries(cats).map(([k, v]) => 
+                `<button class="cat-btn ${k===currentCat?'active':''}" onclick="setCat('${k}')">${v}</button>`
+            ).join('');
+        }
+        
+        function render() {
+            renderCats();
+            const menuDiv = document.getElementById('menu');
+            
+            if (dishes.length === 0) {
+                menuDiv.innerHTML = '<p class="no-dishes">В этой категории пока нет блюд</p>';
+                return;
+            }
+            
+            menuDiv.innerHTML = dishes.map(d => `
+                <div class="dish">
+                    <div class="dish-info">
+                        <div class="dish-name">${d.name}</div>
+                        <div class="dish-desc">${d.description}</div>
+                        <div class="dish-footer">
+                            <div class="price">${d.price} ₽</div>
+                            <button class="add-btn" onclick="add(${d.id})">В корзину</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function setCat(c) {
+            currentCat = c;
+            loadDishes();
+        }
+        
+        function add(id) {
+            const d = dishes.find(x => x.id === id);
+            if (!d) return;
+            
+            const item = cart.find(x => x.id === id);
+            if (item) {
+                item.qty++;
+            } else {
+                cart.push({...d, qty: 1});
+            }            
+            updateCart();
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+        
+        function updateCart() {
+            const countEl = document.getElementById('count');
+            const itemsDiv = document.getElementById('cartItems');
+            const totalEl = document.getElementById('total');
+            
+            const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+            countEl.textContent = totalQty;
+            
+            if (cart.length === 0) {
+                itemsDiv.innerHTML = '<p class="empty-cart">Корзина пуста</p>';
+                totalEl.textContent = '';
+            } else {
+                itemsDiv.innerHTML = cart.map(item => `
+                    <div class="cart-item">
+                        <div class="cart-item-info">
+                            <div class="cart-item-name">${item.name}</div>
+                            <div class="cart-item-price">${item.price} ₽</div>
+                        </div>
+                        <div class="cart-item-controls">
+                            <button class="qty-btn" onclick="decreaseQty(${item.id})">−</button>
+                            <span class="qty-value">${item.qty}</span>
+                            <button class="qty-btn" onclick="increaseQty(${item.id})">+</button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+                totalEl.textContent = `Итого: ${total} ₽`;
+            }
+        }
+        
+        function increaseQty(id) {
+            const item = cart.find(x => x.id === id);
+            if (item) {
+                item.qty++;
+                updateCart();
+            }
+        }
+        
+        function decreaseQty(id) {
+            const item = cart.find(x => x.id === id);
+            if (item && item.qty > 1) {
+                item.qty--;
+                updateCart();
+            }        }
+        
+        function toggleCart() {
+            const modal = document.getElementById('modal');
+            modal.classList.toggle('active');
+            if (modal.classList.contains('active')) {
+                updateCart();
+            }
+        }
+        
+        async function checkout() {
+            if (cart.length === 0) {
+                tg.showAlert('Корзина пуста!');
+                return;
+            }
+            
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            
+            try {
+                const response = await fetch(API_URL + '/api/order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        items: cart,
+                        total: total,
+                        action: 'order_created'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    tg.sendData(JSON.stringify({
+                        action: 'order_created',
+                        order_id: result.order_id,
+                        total: total,
+                        items: cart
+                    }));
+                    
+                    cart = [];
+                    updateCart();
+                    toggleCart();
+                    tg.showAlert(`✅ Заказ оформлен!\n\nСумма: ${total} ₽\n\nМы скоро свяжемся с вами!`);
+                } else {
+                    tg.showAlert('❌ Ошибка при оформлении заказа. Попробуйте еще раз.');
+                }
+            } catch (error) {
+                console.error('Checkout error:', error);
+                tg.showAlert('❌ Ошибка соединения. Проверьте интернет.');
+            }        }
+        
+        // Загрузка при старте
+        loadDishes();
+    </script>
+</body>
+</html>
