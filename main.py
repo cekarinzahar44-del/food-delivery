@@ -11,7 +11,7 @@ import threading
 # ===== FLASK СЕРВЕР (API) =====
 app = Flask(__name__)
 
-# 🔥 CORS для GitHub Pages
+# CORS для GitHub Pages
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -103,7 +103,7 @@ def create_order():
         
         return jsonify({
             'success': True,
-            'order_id': 1,  # В реальном проекте генерировать ID
+            'order_id': 1,
             'message': 'Заказ создан'
         })
     except Exception as e:
@@ -114,7 +114,7 @@ def create_order():
 bot = Bot(token=os.getenv('BOT_TOKEN'))
 dp = Dispatcher()
 
-# 🔥 URL Mini App на GitHub Pages
+# URL Mini App на GitHub Pages
 WEBAPP_URL = os.getenv('WEBAPP_URL', 'https://cekarinzahar44-del.github.io/food-delivery/')
 
 print(f"🔗 WEBAPP_URL: {WEBAPP_URL}")
