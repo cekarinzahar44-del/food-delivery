@@ -3,7 +3,6 @@ import asyncio
 import json
 import sqlite3
 from datetime import datetime
-from functools import wraps
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, ReplyKeyboardMarkup, KeyboardButton
@@ -27,13 +26,16 @@ dp = Dispatcher()
 
 app = Flask(__name__)
 
+# Глобальная переменная для username бота
+BOT_USERNAME = "unknown"
+
 @app.route('/')
 def index():
     """Главная страница API"""
     return jsonify({
         'status': 'ok',
         'service': 'Food Delivery API',
-        'bot': f'@{(await bot.get_me()).username if bot else "unknown"}'
+        'bot': f'@{BOT_USERNAME}'
     })
 
 @app.route('/api/health')
@@ -45,9 +47,9 @@ def health():
 
 def init_db():
     conn = sqlite3.connect('food.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''        CREATE TABLE IF NOT EXISTS orders (
+    cursor = conn.cursor()    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             username TEXT,
@@ -94,9 +96,9 @@ def get_admin_keyboard():
 
 @dp.message(Command('start'))
 async def cmd_start(message: types.Message):
-    await message.answer(
-        f"🍔 <b>Добро пожаловать в Food Delivery!</b>\n\n"
-        f"👋 Привет, <b>{message.from_user.first_name}</b>!\n\n"        f"📱 У нас вы можете заказать:\n"
+    await message.answer(        f"🍔 <b>Добро пожаловать в Food Delivery!</b>\n\n"
+        f"👋 Привет, <b>{message.from_user.first_name}</b>!\n\n"
+        f"📱 У нас вы можете заказать:\n"
         f"• 🍕 Пиццу\n"
         f"• 🍔 Бургеры\n"
         f"• 🍣 Суши и роллы\n"
@@ -143,9 +145,9 @@ async def cmd_admin(message: types.Message):
         parse_mode='HTML'
     )
 
-@dp.message(Command('stats'))
-async def cmd_stats(message: types.Message):
-    if message.from_user.id != ADMIN_ID and ADMIN_ID != 0:        return
+@dp.message(Command('stats'))async def cmd_stats(message: types.Message):
+    if message.from_user.id != ADMIN_ID and ADMIN_ID != 0:
+        return
     
     conn = sqlite3.connect('food.db')
     cursor = conn.cursor()
@@ -192,9 +194,9 @@ async def handle_messages(message: types.Message):
         await message.answer("🍔 <b>Меню открыто!</b>", reply_markup=get_main_keyboard(), parse_mode='HTML')
     elif text == "👤 Мой профиль":
         await message.answer(f"👤 <b>Ваш профиль</b>\n\nИмя: {message.from_user.first_name}\nID: {message.from_user.id}", parse_mode='HTML')
-    elif text == "📞 Контакты":
-        await message.answer("📞 <b>Контакты</b>\n\n📱 +7 (999) 123-45-67\n📧 info@fooddelivery.com", parse_mode='HTML')
-    elif text == "❓ Помощь":        await cmd_help(message)
+    elif text == "📞 Контакты":        await message.answer("📞 <b>Контакты</b>\n\n📱 +7 (999) 123-45-67\n📧 info@fooddelivery.com", parse_mode='HTML')
+    elif text == "❓ Помощь":
+        await cmd_help(message)
     elif text == "📊 Статистика":
         if message.from_user.id == ADMIN_ID or ADMIN_ID == 0:
             await cmd_stats(message)
@@ -206,6 +208,8 @@ async def handle_messages(message: types.Message):
 # ==================== ЗАПУСК ====================
 
 async def main():
+    global BOT_USERNAME
+    
     print("=" * 50)
     print("🚀 Food Delivery Bot запускается...")
     print("=" * 50)
@@ -218,6 +222,11 @@ async def main():
     # Инициализация БД
     init_db()
     
+    # Получаем username бота (в async контексте - можно!)
+    bot_info = await bot.get_me()
+    BOT_USERNAME = bot_info.username
+    print(f"✅ Бот: @{BOT_USERNAME}")
+    
     # Запуск Flask в отдельном потоке
     def run_flask():
         app.run(host='0.0.0.0', port=5000, debug=False)
@@ -226,11 +235,6 @@ async def main():
     flask_thread.start()
     
     print("✅ Flask сервер запущен!")
-    
-    await asyncio.sleep(2)
-    
-    bot_info = await bot.get_me()
-    print(f"✅ Бот запущен! @{bot_info.username}")
     print("=" * 50)
     
     await dp.start_polling(bot)
