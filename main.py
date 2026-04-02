@@ -26,12 +26,10 @@ dp = Dispatcher()
 
 app = Flask(__name__)
 
-# Глобальная переменная для username бота
 BOT_USERNAME = "unknown"
 
 @app.route('/')
 def index():
-    """Главная страница API"""
     return jsonify({
         'status': 'ok',
         'service': 'Food Delivery API',
@@ -40,35 +38,30 @@ def index():
 
 @app.route('/api/health')
 def health():
-    """Проверка здоровья сервера"""
     return jsonify({'status': 'healthy', 'port': 5000})
 
 # ==================== БАЗА ДАННЫХ ====================
 
 def init_db():
     conn = sqlite3.connect('food.db')
-    cursor = conn.cursor()    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            username TEXT,
-            first_name TEXT,
-            items TEXT,
-            total_amount INTEGER,
-            status TEXT DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    cursor = conn.cursor()
     
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS dishes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            price INTEGER,
-            category TEXT
-        )
-    ''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,        user_id INTEGER,
+        username TEXT,
+        first_name TEXT,
+        items TEXT,
+        total_amount INTEGER,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    
+    cursor.execute('''CREATE TABLE IF NOT EXISTS dishes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        price INTEGER,
+        category TEXT
+    )''')
     
     conn.commit()
     conn.close()
@@ -96,14 +89,14 @@ def get_admin_keyboard():
 
 @dp.message(Command('start'))
 async def cmd_start(message: types.Message):
-    await message.answer(        f"🍔 <b>Добро пожаловать в Food Delivery!</b>\n\n"
+    await message.answer(
+        f"🍔 <b>Добро пожаловать в Food Delivery!</b>\n\n"
         f"👋 Привет, <b>{message.from_user.first_name}</b>!\n\n"
         f"📱 У нас вы можете заказать:\n"
         f"• 🍕 Пиццу\n"
         f"• 🍔 Бургеры\n"
         f"• 🍣 Суши и роллы\n"
-        f"• 🍝 Пасту\n"
-        f"• 🥗 Салаты\n"
+        f"• 🍝 Пасту\n"        f"• 🥗 Салаты\n"
         f"• 🥤 Напитки\n\n"
         f"🚀 <b>Нажмите кнопку ниже, чтобы открыть меню!</b>",
         reply_markup=get_main_keyboard(),
@@ -145,14 +138,14 @@ async def cmd_admin(message: types.Message):
         parse_mode='HTML'
     )
 
-@dp.message(Command('stats'))async def cmd_stats(message: types.Message):
+@dp.message(Command('stats'))
+async def cmd_stats(message: types.Message):
     if message.from_user.id != ADMIN_ID and ADMIN_ID != 0:
         return
     
     conn = sqlite3.connect('food.db')
     cursor = conn.cursor()
-    
-    cursor.execute('SELECT COUNT(*) FROM orders')
+        cursor.execute('SELECT COUNT(*) FROM orders')
     total_orders = cursor.fetchone()[0]
     
     cursor.execute("SELECT COUNT(*) FROM orders WHERE status='pending'")
@@ -194,16 +187,16 @@ async def handle_messages(message: types.Message):
         await message.answer("🍔 <b>Меню открыто!</b>", reply_markup=get_main_keyboard(), parse_mode='HTML')
     elif text == "👤 Мой профиль":
         await message.answer(f"👤 <b>Ваш профиль</b>\n\nИмя: {message.from_user.first_name}\nID: {message.from_user.id}", parse_mode='HTML')
-    elif text == "📞 Контакты":        await message.answer("📞 <b>Контакты</b>\n\n📱 +7 (999) 123-45-67\n📧 info@fooddelivery.com", parse_mode='HTML')
+    elif text == "📞 Контакты":
+        await message.answer("📞 <b>Контакты</b>\n\n📱 +7 (999) 123-45-67\n📧 info@fooddelivery.com", parse_mode='HTML')
     elif text == "❓ Помощь":
         await cmd_help(message)
     elif text == "📊 Статистика":
         if message.from_user.id == ADMIN_ID or ADMIN_ID == 0:
             await cmd_stats(message)
-    elif text == "🔙 Главное меню":
-        await cmd_start(message)
+    elif text == "🔙 Главное меню":        await cmd_start(message)
     else:
-        await message.answer(f"🤔 Воспользуйтесь меню или введите /help")
+        await message.answer("🤔 Воспользуйтесь меню или введите /help")
 
 # ==================== ЗАПУСК ====================
 
@@ -219,15 +212,12 @@ async def main():
     print(f"🌐 Flask сервер: http://0.0.0.0:5000")
     print("=" * 50)
     
-    # Инициализация БД
     init_db()
     
-    # Получаем username бота (в async контексте - можно!)
     bot_info = await bot.get_me()
     BOT_USERNAME = bot_info.username
     print(f"✅ Бот: @{BOT_USERNAME}")
     
-    # Запуск Flask в отдельном потоке
     def run_flask():
         app.run(host='0.0.0.0', port=5000, debug=False)
     
