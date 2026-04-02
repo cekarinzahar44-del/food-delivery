@@ -1,8 +1,3 @@
-# 📄 **ПОЛНЫЙ РАБОЧИЙ `main.py`**
-
-**Копируй ВСЁ от начала до конца:**
-
-```python
 import os
 import asyncio
 import sqlite3
